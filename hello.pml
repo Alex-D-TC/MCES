@@ -1,124 +1,92 @@
-
 #define GATE_OPEN 0
 #define GATE_CLOSED 1
-#define OS_CLEAR 2
-#define OS_BUSY 3
 
-byte gateState;
-bool debrisExists;
+#define OS_CLEAR 0
+#define OS_BUSY 1
 
-ltl p0 { !(gate_state == GATE_OPEN U gate_state == GATE_CLOSED) }
+byte osState = OS_BUSY;
+byte gsState = GATE_CLOSED;
+
+ltl p0 { gsState == GATE_CLOSED -> <> ( gsState == GATE_OPEN ) }
+ltl p1 { <> ( osState == OS_CLEAR ) }
+ltl p2 { osState == OS_CLEAR -> gsState == GATE_OPEN }
 
 proctype RemoteController(chan In, Out) {
-
-    printf("Started remote controller\n")
-
+    
     byte signal;
- 
-    // Wait for signals from in
+    
     In?signal;
 
-    printf("RC: Signalling Gate Sensor to open / close the gate\n")
-
-    // Forward the signal to the Gate Sensor 
     Out!signal;
+
+    printf("RC: Done\n")
 }
 
-proctype GateSensor(chan RCIn, OSIn, OSOut) {
-
-    printf("Started gate sensor\n")
-
-    byte gateState;
-    byte signal;
-
-    // Select a starting state randomly
-    if
-    :: true -> 
-        gateState = GATE_OPEN;
-        printf("GS: Started with OPEN gate\n")
-    :: true -> 
-        gateState = GATE_CLOSED;
-        printf("GS: Started with CLOSED gate\n")
-    fi
-
-    // Wait for signals from the remote controller
-    RCIn?signal;
-
-    printf("GS: Received signal from the remote controller\n")
-
-    if
-    :: gateState == GATE_CLOSED -> 
-        printf("GS: Gate is now open\n")
-        gateState = GATE_OPEN;
-    :: gateState == GATE_OPEN ->
-        
-        // Wait for the debris to be clear
-        do
-        :: true -> 
-
-            printf("GS: Notifying the Obstacle Sensor to check for debris\n")
-
-            // Signal the Obstacle Sensor to check for objects
-            OSOut!1;
-            
-            // Wait for the Obstacle Sensor to signal that everything is ok
-            byte osState;
-            
-            OSIn?osState;
-
-            if
-            :: osState == OS_CLEAR ->
-                printf("GS: No debris. Gate is now open\n")
-                state = GATE_OPEN;
-                break;
-            :: osState == OS_BUSY ->
-                printf("GS: Debris detected. Attempting again\n")
-            fi
-        od
-
-    fi
-}
-
-proctype ObstacleSensor(chan GateRequests, GateReplies) {
-
-    printf("Started obstacle sensor\n")
-
-    byte signal;
-
-    // Wait for a signal
-    GateRequests?signal;
+proctype GateSensor(chan RIn, OIn, OOut) {
     
-    // Checking for debris
-    if
-    :: true ->
-        debrisExists = true
-    :: true ->
-        debrisExists = false
-    fi
+    byte signal;
 
-    // Randomly return there being debris or not
-    if
-    :: !debrisExists -> 
-        printf("Sending OS_CLEAR message\n")
-        GateReplies!OS_CLEAR
-    :: debrisExists -> 
-        printf("Sending OS_BUSY message\n")
-        GateReplies!OS_BUSY
-    fi
+    RIn?signal;
+ 
+    do
+    ::
+        OOut!1
+        
+        OIn?osState
+
+        if 
+        :: osState == OS_CLEAR -> 
+            printf("GS: Received OS_CLEAR\n")
+            printf("GS: Switching gate state\n")
+            
+            if
+            :: gsState == GATE_CLOSED -> gsState = GATE_OPEN
+            :: gsState == GATE_OPEN -> gsState = GATE_CLOSED
+            fi
+
+            break
+        :: osState == OS_BUSY ->
+            printf("GS: Received OS_BUSY\n")
+        fi
+    od
+
+    printf("GS: Done\n")
+}
+
+proctype ObstacleSensor(chan In, Out) {
+
+    byte signal;
+
+    do
+    ::
+        In?signal;
+
+        if
+        :: osState == OS_BUSY -> 
+            Out!OS_CLEAR
+            break
+        :: osState == OS_CLEAR -> Out!OS_BUSY;
+        fi
+    od
+
+    printf("OS: Done\n")
 }
 
 init {
-    chan RCIn = [0] of {byte};
-    chan RCOut = [0] of {byte};
 
-    chan GateRequests = [0] of {byte};
-    chan GateReplies = [0] of {byte};
+    chan OSOut = [0] of {byte};
+    chan OSIn = [0] of {byte};
 
-    atomic {
-        run RemoteController(RCIn, RCOut);
-        run GateSensor(RCOut, GateReplies, GateRequests);
-        run ObstacleSensor(GateRequests, GateReplies);
+    chan ROut = [0] of {byte};
+    chan RIn = [0] of {byte};
 
-        RCIn!1;
-    }
+    run RemoteController(RIn, ROut)
+    run GateSensor(ROut, OSOut, OSIn)
+    run ObstacleSensor(OSIn, OSOut)
+
+    printf("Running main\n")
+
+    RIn!1
+
+    printf("Done\n");
 }
