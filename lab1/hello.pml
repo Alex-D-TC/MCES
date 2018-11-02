@@ -7,9 +7,9 @@
 byte osState = OS_BUSY;
 byte gsState = GATE_CLOSED;
 
-ltl p0 { gsState == GATE_CLOSED -> <> ( gsState == GATE_OPEN ) }
-ltl p1 { <> ( osState == OS_CLEAR ) }
-ltl p2 { osState == OS_CLEAR -> gsState == GATE_OPEN }
+ltl p1 { gsState == GATE_CLOSED U gsState == GATE_OPEN }
+ltl p2 { osState == OS_BUSY U osState == OS_CLEAR }
+ltl p3 { <> (gsState == GATE_CLOSED && osState == OS_CLEAR) U gsState == GATE_OPEN }
 
 proctype RemoteController(chan In, Out) {
     
@@ -32,10 +32,10 @@ proctype GateSensor(chan RIn, OIn, OOut) {
     ::
         OOut!1
         
-        OIn?osState
+        OIn?signal
 
         if 
-        :: osState == OS_CLEAR -> 
+        :: signal == OS_CLEAR -> 
             printf("GS: Received OS_CLEAR\n")
             printf("GS: Switching gate state\n")
             
@@ -45,7 +45,7 @@ proctype GateSensor(chan RIn, OIn, OOut) {
             fi
 
             break
-        :: osState == OS_BUSY ->
+        :: signal == OS_BUSY ->
             printf("GS: Received OS_BUSY\n")
         fi
     od
@@ -63,10 +63,16 @@ proctype ObstacleSensor(chan In, Out) {
 
         if
         :: osState == OS_BUSY -> 
-            Out!OS_CLEAR
+            
+            osState = OS_CLEAR
+            Out!osState
             break
-        :: osState == OS_CLEAR -> Out!OS_BUSY;
+        :: osState == OS_CLEAR -> 
+            
+            osState = OS_BUSY
+            Out!osState
         fi
+
     od
 
     printf("OS: Done\n")

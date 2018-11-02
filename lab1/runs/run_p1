@@ -1,0 +1,50 @@
+pan: ltl formula p1
+
+(Spin Version 6.4.8 -- 2 March 2018)
+	+ Partial Order Reduction
+
+Full statespace search for:
+	never claim         	+ (p1)
+	assertion violations	+ (if within scope of claim)
+	acceptance   cycles 	+ (fairness disabled)
+	invalid end states	- (disabled by never claim)
+
+State-vector 80 byte, depth reached 38, errors: 0
+       18 states, stored (36 visited)
+       16 states, matched
+       52 transitions (= visited+matched)
+        0 atomic steps
+hash conflicts:         0 (resolved)
+
+Stats on memory usage (in Megabytes):
+    0.002	equivalent memory usage for states (stored*(State-vector + overhead))
+    0.284	actual memory usage for states
+  128.000	memory used for hash table (-w24)
+    0.534	memory used for DFS stack (-m10000)
+  128.730	total actual memory usage
+
+
+unreached in proctype RemoteController
+	(0 of 4 states)
+unreached in proctype GateSensor
+	hello.pml:44, state 10, "gsState = 1"
+	hello.pml:54, state 22, "-end-"
+	(2 of 22 states)
+unreached in proctype ObstacleSensor
+	hello.pml:72, state 7, "osState = 1"
+	hello.pml:73, state 8, "Out!osState"
+	(2 of 15 states)
+unreached in init
+	(0 of 7 states)
+unreached in claim p1
+	_spin_nvr.tmp:9, state 10, "-end-"
+	(1 of 10 states)
+
+pan: elapsed time 0 seconds
+ltl p1: ((gsState==1)) U ((gsState==0))
+ltl p2: ((osState==1)) U ((osState==0))
+ltl p3: (<> (((gsState==1)) && ((osState==0)))) U ((gsState==0))
+  the model contains 3 never claims: p3, p2, p1
+  only one claim is used in a verification run
+  choose which one with ./pan -a -N name (defaults to -N p1)
+  or use e.g.: spin -search -ltl p1 hello.pml
